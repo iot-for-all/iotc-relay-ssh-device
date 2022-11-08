@@ -1,0 +1,6 @@
+{
+    "scopeId": "<scopeId of IoTC app>",
+    "groupSymmetricKey": "<enrollment group primary key>",
+    "modelId": "<id of model containing remote terminal interface>",
+    "deviceId": "<id for device>"
+}

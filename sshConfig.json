@@ -1,0 +1,4 @@
+{
+    "host": "<WSL ip address>",
+    "port": 22
+}
