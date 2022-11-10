@@ -478,71 +478,105 @@ function startRelayListener(ns, path, keyrule, key) {
             token
         }, 
         (ws) => {
+            try {
 
-            console.log('relayed connection accepted');
+                console.log('relayed connection accepted');
 
-            const username = new URL(ws.url).searchParams.get('username');
+                const username = new URL(ws.url).searchParams.get('username');
 
-            ws.id = getUniqueID();
-            clients[ws.id] = ws;
+                ws.id = getUniqueID();
+                clients[ws.id] = ws;
 
-            wss.clients.forEach(function each(client) {
-                console.log('Client.ID: ' + client.id);
-            });
-
-            // start SSH client and connect to local SSH
-            const sshConn = new SSHClient();
-
-            sshConn.on('ready', () => {
-                console.log('---- SSH SESSION READY ----');
-
-                sshConn.shell((err, stream) => {
-                    if (err) throw err;
-
-                    stream.on('close', () => {
-                        console.log('closing SSH client');
-                        sshConn.end();
-                        clients[ws.id].close();
-                    }).on('data', (data) => {  // from SSH output stream
-                        ws.send(data.toString('binary'));
-                    });
-
-                    ws.on('message', function message(data) { // terminal input from IoT Central
-                        stream.write(data);
-                    });
-
+                wss.clients.forEach(function each(client) {
+                    console.log('Client.ID: ' + client.id);
                 });
-            }).on('keyboard-interactive', (name, instructions, lang, prompts, finish) => {
-                console.log('---- KEYBOARD-INTERACTIVE ----')
-                let password = '';
-                ws.on('open', () => {
-                    ws.send(`Type your password and hit enter: `);
+
+                // start SSH client and connect to local SSH
+                const sshConn = new SSHClient();
+
+                sshConn.on('ready', () => {
+                    console.log('---- SSH SESSION READY ----');
+
+                    sshConn.shell((err, stream) => {
+                        if (err) throw err;
+
+                        stream.on('close', () => {
+                            console.log('closing SSH client');
+                            sshConn.end();
+                            clients[ws.id].close();
+                        }).on('data', (data) => {  // from SSH output stream
+                            ws.send(data.toString('binary'));
+                        });
+
+                        ws.on('message', function message(data) { // terminal input from IoT Central
+                            stream.write(data);
+                        });
+
+                    });
+                }).on('keyboard-interactive', (name, instructions, lang, prompts, finish) => {
+                    console.log('---- KEYBOARD-INTERACTIVE ----')
+                    let password = '';
+                    ws.on('open', async () => {
+                        // delay 1 second for terminal to render
+                        await new Promise(resolve => {
+                            setTimeout(resolve, 1000);
+                        });
+                        ws.send(`Type your password and hit enter: `);
+                    });
+                    ws.on('message', (data) => {
+                        if (NEWLINE.includes(data)) {
+                            ws.send('\r\n');
+                            ws.onmessage = null;
+                            try {
+                                finish([password]);
+                            } catch (pwdError) {
+                                console.log(pwdError);
+                                password = '';
+                            }
+                            
+                        } else {
+                            if (data.charCodeAt(0) === 127) { // backspace from UX is sent as Delete
+                                if (password.length) {
+                                    password = password.substring(0, password.length - 1);
+                                    ws.send('\b');  // back up the cursor in the terminal UX
+                                } else {
+                                    password = '';
+                                }
+                            } else {
+                                password = password.concat(data);
+                                ws.send('*');
+                            }
+                            const hiddenPassword = password.replace(/(.)/g, '*');
+                            console.log('Password:', hiddenPassword);                       
+                        }
+                    });
+                }).connect({
+                    host,
+                    port,
+                    username,
+                    tryKeyboard: true,
+                    readyTimeout: 30 * 1000,
+                    debug: console.log,
+                }).on('error', (error) => {
+                    const errorMessage = `Error occurred connecting to SSH server: ${error.message}`;
+                    console.log(errorMessage);
+                    ws.close(1011, errorMessage);
                 });
-                ws.on('message', (data) => {
-                    if (NEWLINE.includes(data)) {
-                        ws.send('\r\n');
-                        ws.onmessage = null;
-                        finish([password]);
-                    } else {
-                        password = password.concat(data);
-                        const hiddenPassword = password.replace(/(.)/g, '*');
-                        console.log('Password:', hiddenPassword);                       
+
+                ws.on('close', function close() {
+                    console.log(`Client ${ws.id} connection closed.`);
+                    clients[ws.id] = undefined;
+                    const remainingClients = Object.keys(clients).length;
+                    if (remainingClients) {
+                        console.log('No other clients are connected.');
+                        wss.close();
                     }
                 });
-            }).connect({
-                host,
-                port,
-                username,
-                tryKeyboard: true,
-                readyTimeout: 30 * 1000,
-                debug: console.log,
-            });
 
-            ws.on('close', function close() {
-                console.log(`Client ${ws.id} connection closed.`);
-                clients[ws.id] = undefined;
-                wss.close();
-            });
+            } catch (error) {
+                console.log(`Error occurred: ${error.message}`);
+                ws.close();
+            }
         }
     );
 
