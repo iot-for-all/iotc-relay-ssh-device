@@ -42,9 +42,8 @@ let listenerConnectionString;
 // SSH variables
 const SSHClient = require('ssh2').Client;
 let secrets = require('./sshConfig.json');
-let host = secrets && secrets.host || 'localhost';
+let host = secrets && secrets.host || getLocalIpAddress() || 'localhost';
 let port = secrets && secrets.port || 22;  // SSH
-
 
 // general purpose variables
 let client = null;
@@ -601,4 +600,22 @@ function startRelayListener(ns, path, keyrule, key) {
 
     console.log(`Relayed Server started @ ${Date.now()}`);
     return wss;
+}
+
+function getLocalIpAddress() {
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    const results = Object.create(null);
+    for (const name of Object.keys(nets)) {
+        if (name[0] == 'v' || name[0] == 'V')  // looking for virtual network adapter names and ignoring them
+            continue;
+        for (const net of nets[name]) {
+            const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
+            if (net.family === familyV4Value && !net.internal) {
+                results[name] = net.address;
+            }
+        }
+    }
+    const ipAddress = results['eth0'] || Object.values(results)?.[0];
+    return ipAddress;
 }
