@@ -471,12 +471,13 @@ function startRelayListener(ns, path, keyrule, key) {
 
     const server = WebSocket.createRelayListenUri(ns, path);
     const token = function() { return WebSocket.createRelayToken('http://' + ns, keyrule, key); };
+    // wss is the websocket server on the device that listens for connections from relay clients (from IoT Central)
     const wss = WebSocket.createRelayedServer(
         {
             server,
             token
         }, 
-        (ws) => {
+        (ws) => {  // ws is an individual client websocket connection (terminal session from IoT Central client)
             try {
 
                 console.log('relayed connection accepted');
@@ -516,7 +517,7 @@ function startRelayListener(ns, path, keyrule, key) {
                     console.log('---- KEYBOARD-INTERACTIVE ----')
                     let password = '';
                     ws.on('open', async () => {
-                        // delay 1 second for terminal to render
+                        // delay 1 second for terminal to render TEMPORARY FIX
                         await new Promise(resolve => {
                             setTimeout(resolve, 1000);
                         });
@@ -587,13 +588,13 @@ function startRelayListener(ns, path, keyrule, key) {
         console.log('Clearing relayServer listener.')
         listenerConnectionString = undefined;
         wss.clients.forEach(client => client.close());
-        relayServer.close();
+        relayServer?.close(); 
         relayServer = undefined;
     });
 
     wss.on('close', function close() {
         console.log('shutting down relayed server');
-        relayServer.close();
+        relayServer?.close(); // null check in case of race between stop command and wss.close() in ws onClose handler 
         relayServer = undefined;
     });
 
