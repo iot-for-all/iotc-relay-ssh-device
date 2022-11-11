@@ -565,8 +565,7 @@ function startRelayListener(ns, path, keyrule, key) {
                 ws.on('close', function close() {
                     console.log(`Client ${ws.id} connection closed.`);
                     clients[ws.id] = undefined;
-                    const remainingClients = Object.keys(clients).length;
-                    if (remainingClients) {
+                    if (!Object.keys(clients).length) {
                         console.log('No other clients are connected.');
                         wss.close();
                     }
