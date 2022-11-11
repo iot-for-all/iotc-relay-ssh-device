@@ -588,13 +588,17 @@ function startRelayListener(ns, path, keyrule, key) {
         console.log('Clearing relayServer listener.')
         listenerConnectionString = undefined;
         wss.clients.forEach(client => client.close());
-        relayServer?.close(); 
+        if (relayServer) {
+            relayServer.close(); 
+        }
         relayServer = undefined;
     });
 
     wss.on('close', function close() {
         console.log('shutting down relayed server');
-        relayServer?.close(); // null check in case of race between stop command and wss.close() in ws onClose handler 
+        if (relayServer) {
+            relayServer.close(); // null check in case of race between stop command and wss.close() in ws onClose handler
+        }
         relayServer = undefined;
     });
 
@@ -616,6 +620,7 @@ function getLocalIpAddress() {
             }
         }
     }
-    const ipAddress = results['eth0'] || Object.values(results)?.[0];
+    const values = Object.values(results);
+    const ipAddress = results['eth0'] || values[0];
     return ipAddress;
 }
