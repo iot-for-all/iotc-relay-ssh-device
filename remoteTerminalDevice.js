@@ -490,6 +490,10 @@ function startRelayListener(ns, path, keyrule, key) {
                     console.log('Client.ID: ' + client.id);
                 });
 
+                ws.on('open', async () => {
+                    ws.send(`Type your password and hit enter: `);
+                });
+
                 // start SSH client and connect to local SSH
                 const sshConn = new SSHClient();
 
@@ -515,13 +519,7 @@ function startRelayListener(ns, path, keyrule, key) {
                 }).on('keyboard-interactive', (name, instructions, lang, prompts, finish) => {
                     console.log('---- KEYBOARD-INTERACTIVE ----')
                     let password = '';
-                    ws.on('open', async () => {
-                        // delay 1 second for terminal to render
-                        await new Promise(resolve => {
-                            setTimeout(resolve, 1000);
-                        });
-                        ws.send(`Type your password and hit enter: `);
-                    });
+
                     ws.on('message', (data) => {
                         if (NEWLINE.includes(data)) {
                             ws.send('\r\n');
