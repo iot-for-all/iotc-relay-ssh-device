@@ -471,12 +471,13 @@ function startRelayListener(ns, path, keyrule, key) {
 
     const server = WebSocket.createRelayListenUri(ns, path);
     const token = function() { return WebSocket.createRelayToken('http://' + ns, keyrule, key); };
+    // wss is the websocket server on the device that listens for connections from relay clients (from IoT Central)
     const wss = WebSocket.createRelayedServer(
         {
             server,
             token
         }, 
-        (ws) => {
+        (ws) => {  // ws is an individual client websocket connection (terminal session from IoT Central client)
             try {
 
                 console.log('relayed connection accepted');
@@ -519,7 +520,6 @@ function startRelayListener(ns, path, keyrule, key) {
                 }).on('keyboard-interactive', (name, instructions, lang, prompts, finish) => {
                     console.log('---- KEYBOARD-INTERACTIVE ----')
                     let password = '';
-
                     ws.on('message', (data) => {
                         if (NEWLINE.includes(data)) {
                             ws.send('\r\n');
@@ -563,8 +563,7 @@ function startRelayListener(ns, path, keyrule, key) {
                 ws.on('close', function close() {
                     console.log(`Client ${ws.id} connection closed.`);
                     clients[ws.id] = undefined;
-                    const remainingClients = Object.keys(clients).length;
-                    if (remainingClients) {
+                    if (!Object.keys(clients).length) {
                         console.log('No other clients are connected.');
                         wss.close();
                     }
@@ -586,13 +585,17 @@ function startRelayListener(ns, path, keyrule, key) {
         console.log('Clearing relayServer listener.')
         listenerConnectionString = undefined;
         wss.clients.forEach(client => client.close());
-        relayServer.close();
+        if (relayServer) {
+            relayServer.close(); 
+        }
         relayServer = undefined;
     });
 
     wss.on('close', function close() {
         console.log('shutting down relayed server');
-        relayServer.close();
+        if (relayServer) {
+            relayServer.close(); // null check in case of race between stop command and wss.close() in ws onClose handler
+        }
         relayServer = undefined;
     });
 
@@ -614,6 +617,7 @@ function getLocalIpAddress() {
             }
         }
     }
-    const ipAddress = results['eth0'] || Object.values(results)?.[0];
+    const values = Object.values(results);
+    const ipAddress = results['eth0'] || values[0];
     return ipAddress;
 }
