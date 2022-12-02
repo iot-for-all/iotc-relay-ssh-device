@@ -507,7 +507,9 @@ function startRelayListener(ns, path, keyrule, key) {
                         stream.on('close', () => {
                             console.log('closing SSH client');
                             sshConn.end();
-                            clients[ws.id].close();
+                            if (clients[ws.id]) {
+                                clients[ws.id].close();
+                            }
                         }).on('data', (data) => {  // from SSH output stream
                             ws.send(data.toString('binary'));
                         });
